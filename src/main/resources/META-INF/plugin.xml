@@ -1,0 +1,33 @@
+<idea-plugin>
+    <id>com.slackow.Func</id>
+    <name>Func</name>
+    <vendor email="SlackowYT@gmail.com" url="https://github.com/Slackow">SlackowYT</vendor>
+
+    <description><![CDATA[
+    A plugin made to support the language Func.
+    Go to GitHub page for a wiki.
+    ]]></description>
+
+    <!-- please see https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
+         on how to target different products -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Add your extensions here -->
+    </extensions>
+
+    <application-components/>
+
+    <project-components>
+        <component>
+            <implementation-class>com.slackow.func.FuncPluginController</implementation-class>
+        </component>
+    </project-components>
+
+    <actions>
+        <!-- Add your actions here -->
+    </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+    </extensions>
+</idea-plugin>
