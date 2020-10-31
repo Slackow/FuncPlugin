@@ -12,7 +12,7 @@ statement
 | whileLoop
 | doWhileLoop
 | defineFunctionStatement
-| genMcfunctionStatement
+| genMCfunctionStatement
 ;
 
 line
@@ -22,7 +22,9 @@ line
 | functionCallLine
 ;
 
-endingLine: RETURN expr | BREAK | CONTINUE;
+genMCfunctionStatement: GEN FUNCTION exprBlock;
+
+endingLine: (RETURN expr? | BREAK | CONTINUE) SEMI;
 
 exprBlock: expr statBlock;
 
@@ -35,7 +37,7 @@ forLoop: FOR LPAREN line? SEMI expr? SEMI line? RPAREN statBlock;
 forEachLoop: FOR idenList IN expr statBlock
 | FOR LPAREN idenList IN expr RPAREN statBlock;
 
-command: ;
+command: (OPEN_COMMAND | NEWLINE_COMMAND);
 
 whileLoop: WHILE exprBlock;
 
