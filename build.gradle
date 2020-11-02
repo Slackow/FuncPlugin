@@ -1,25 +1,53 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
 plugins {
     id 'java'
     id 'org.jetbrains.intellij' version '0.5.0'
 }
 
+wrapper {
+    gradleVersion = '5.2.1'
+}
+
 group 'com.slackow'
 version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'org.jetbrains.intellij'
+apply plugin: 'antlr'
+
+compileJava {
+    sourceCompatibility = targetCompatibility = '1.8'
+}
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    antlr("org.antlr:antlr4:4.7.2") {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
 
 // See https://github.com/JetBrains/gradle-intellij-plugin/
 intellij {
     version '2020.2.3'
+
+    pluginName 'funclang'
 }
 patchPluginXml {
     changeNotes """
       Add change notes here.<br>
       <em>most HTML tags may be used</em>"""
+}
+
+generateGrammarSource {
+    arguments += ["-package", "com.slackow.func.parser", "-no-listener", "-visitor", "-Xexact-output-dir"]
+    outputDirectory = new File(buildDir.toString() + "/generated-src/antlr/main/com/slackow/func/parser/")
 }

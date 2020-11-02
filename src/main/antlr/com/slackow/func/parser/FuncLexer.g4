@@ -2,8 +2,6 @@ lexer grammar FuncLexer;
 
 
 
-
-
 AND: '&&';
 OR: '||';
 

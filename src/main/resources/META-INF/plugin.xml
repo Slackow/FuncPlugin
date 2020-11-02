@@ -1,6 +1,7 @@
 <idea-plugin>
-    <id>com.slackow.Func</id>
-    <name>Func</name>
+    <id>com.slackow.func</id>
+    <name>FuncLang</name>
+    <version>0.1</version>
     <vendor email="SlackowYT@gmail.com" url="https://github.com/Slackow">SlackowYT</vendor>
 
     <description><![CDATA[
@@ -25,7 +26,7 @@
     </project-components>
 
     <actions>
-        <!-- Add your actions here -->
+
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
