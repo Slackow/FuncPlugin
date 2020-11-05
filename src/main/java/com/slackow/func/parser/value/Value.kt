@@ -1,21 +1,10 @@
-package com.slackow.func.parser.value;
+package com.slackow.func.parser.value
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*
 
-public class Value {
-    private final Type type;
-    private final Map<String, Value> properties = new HashMap<>();
-
-    public Value(Type type) {
-        this.type = type;
-    }
-
-    public String toJsonValue() {
-        throw new UnsupportedOperationException();
-    }
-
-    public Type getType() {
-        return type;
+abstract class Value(open val type: Type) {
+    private val properties: Map<String, Value> = HashMap()
+    open fun toJsonValue(): String {
+        throw UnsupportedOperationException()
     }
 }

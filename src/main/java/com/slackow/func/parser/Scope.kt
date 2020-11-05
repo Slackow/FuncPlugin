@@ -1,6 +1,6 @@
-package com.slackow.func.parser;
+package com.slackow.func.parser
 
-import java.util.HashMap;
+import java.util.*
 
 /**
  * A collection meant for variable storage, described the way scopes get deeper and then get shallower with every
@@ -8,36 +8,21 @@ import java.util.HashMap;
  *
  * this is probably a bad description.
  * @param <T> type of variable
- */
-public class Scope<T> extends HashMap<String, T> {
-    public Scope<T> getParent() {
-        return defaults;
-    }
+</T> */
+class Scope<T> private constructor(val parent: Scope<T>?) : HashMap<String, T>() {
 
-    private final Scope<T> defaults;
+    constructor() : this(null)
 
-    private Scope(Scope<T> defaults) {
-        this.defaults = defaults;
-    }
+    fun getProperty(key: String): T? = super.get(key) ?: parent?.getProperty(key)
 
-    public Scope() {
-        this(null);
-    }
-
-    public T getProperty(String key) {
-        T value = super.get(key);
-        return value == null && defaults != null ? defaults.getProperty(key) : value;
-    }
-
-    public void setProperty(String key, T value) {
-        Scope<T> scope = this;
-        while (scope != null && !scope.containsKey(key)) {
-            scope = scope.getParent();
+    fun setProperty(key: String, value: T) {
+        var scope: Scope<T>? = this
+        while (scope?.containsKey(key) == false) {
+            scope = scope.parent
         }
-        (scope == null ? this : scope).put(key,value);
+        (scope ?: this)[key] = value
     }
 
-    public Scope<T> getNewChild() {
-        return new Scope<>(this);
-    }
+    val newChild: Scope<T>
+        get() = Scope(this)
 }

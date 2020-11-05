@@ -1,18 +1,12 @@
-package com.slackow.func.parser.value.values;
+package com.slackow.func.parser.value.values
 
-import com.slackow.func.parser.value.Value;
-import com.slackow.func.parser.value.types.BooleanType;
+import com.slackow.func.parser.value.Type
+import com.slackow.func.parser.value.Value
+import com.slackow.func.parser.value.types.BooleanType
 
-public class BooleanValue extends Value {
+class BooleanValue(val value: Boolean?) : Value(BooleanType) {
 
-    private boolean value;
-
-    public BooleanValue(Boolean b) {
-        super(BooleanType.INSTANCE);
-    }
-
-    @Override
-    public String toJsonValue() {
-        return toString();
+    override fun toJsonValue(): String {
+        return toString()
     }
 }
