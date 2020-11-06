@@ -1,6 +1,5 @@
 package com.slackow.func.parser
 
-import java.util.*
 
 /**
  * A collection meant for variable storage, described the way scopes get deeper and then get shallower with every
@@ -13,14 +12,19 @@ class Scope<T> private constructor(val parent: Scope<T>?) : HashMap<String, T>()
 
     constructor() : this(null)
 
-    fun getProperty(key: String): T? = super.get(key) ?: parent?.getProperty(key)
+    override operator fun get(key: String): T? = getDirect(key) ?: parent?.get(key)
 
-    fun setProperty(key: String, value: T) {
+    fun getDirect(key: String) = super.get(key)
+
+    fun setDirect(key: String, value: T) = super.put(key, value)
+
+    operator fun set(key: String, value: T): T? {
         var scope: Scope<T>? = this
-        while (scope?.containsKey(key) == false) {
+        while (scope != null && scope.getDirect(key) == null) {
             scope = scope.parent
         }
-        (scope ?: this)[key] = value
+        (scope ?: this).setDirect(key, value)
+        return value
     }
 
     val newChild: Scope<T>

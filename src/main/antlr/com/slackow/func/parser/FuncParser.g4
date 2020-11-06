@@ -106,7 +106,7 @@ expr
 | UNDEFINED #undefinedAtom
 | THIS # thisAtom
 | BOOL # boolAtom
-| IDEN # varName
+| IDEN # varAtom
 ;
 
 objectPart: (IDEN | string) COLON expr;
