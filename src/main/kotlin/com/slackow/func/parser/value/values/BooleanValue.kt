@@ -10,5 +10,7 @@ class BooleanValue(private val data: Boolean) : Value(BooleanType) {
     object BooleanType : Type() {
         override val typeName: String
             get() = "boolean"
+        override val canChangeProperties: Boolean
+            get() = false
     }
 }

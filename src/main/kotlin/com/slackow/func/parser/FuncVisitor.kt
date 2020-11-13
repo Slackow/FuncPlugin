@@ -1,11 +1,13 @@
 package com.slackow.func.parser
 
-import com.slackow.func.parser.FuncLexer.*
+import com.slackow.func.parser.FuncParser.*
+import com.slackow.func.parser.value.ReturnValue
 import com.slackow.func.parser.value.Value
 import com.slackow.func.parser.value.values.*
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTree
+import java.lang.Integer.max
 import java.util.*
 import java.util.stream.Collectors
 
@@ -43,37 +45,71 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         return super.visit(tree)
     }
 
-    override fun visitBoolAtom(ctx: FuncParser.BoolAtomContext) = BooleanValue(ctx.text!!.toBoolean())
+    override fun visitBoolAtom(ctx: BoolAtomContext) = BooleanValue(ctx.text!!.toBoolean())
 
-    override fun visitNumAtom(ctx: FuncParser.NumAtomContext) = DoubleValue(ctx.text.toDouble())
+    override fun visitNumAtom(ctx: NumAtomContext) = DoubleValue(ctx.text.toDouble())
 
-    override fun visitThisAtom(ctx: FuncParser.ThisAtomContext) = memory["this"]
+    override fun visitThisAtom(ctx: ThisAtomContext) = memory["this"]
 
-    override fun visitUndefinedAtom(ctx: FuncParser.UndefinedAtomContext?): Value? = null
+    override fun visitUndefinedAtom(ctx: UndefinedAtomContext): Value? = null
 
-    override fun visitVarAtom(ctx: FuncParser.VarAtomContext) = memory[ctx.text]
+    override fun visitVarAtom(ctx: VarAtomContext) = memory[ctx.text]
 
-    override fun visitStringAtom(ctx: FuncParser.StringAtomContext) = visit(ctx.string())
+    override fun visitStringAtom(ctx: StringAtomContext) = visit(ctx.string())
 
-    override fun visitString(ctx: FuncParser.StringContext): Value? {
+    override fun visitListAtom(ctx: ListAtomContext): Value? {
+        return ListValue(ctx.exprList().expr().map { this.visit(it) }.toMutableList())
+    }
+
+    override fun visitObjectAtom(ctx: ObjectAtomContext): Value? {
+        val result = ObjectValue()
+        ctx.objectPart().forEach { result.properties[it.IDEN().text] = visit(it.expr()) }
+        return result
+    }
+
+    override fun visitString(ctx: StringContext): Value? {
         return StringValue(ctx.stringPart().stream().map(stringVisitor::visit).collect(Collectors.joining()))
     }
 
-    override fun visitLambdaAtom(ctx: FuncParser.LambdaAtomContext): Value? {
+    override fun visitLambdaAtom(ctx: LambdaAtomContext): Value? {
         return MethodValue { input ->
             enterScope()
             for ((i, node) in (ctx.idenList()?.IDEN() ?: listOf(ctx.IDEN())).withIndex()) {
                 memory[node.text] = input[i]
             }
-            val result = visit(ctx.expr() ?: ctx.block())
+            val result = if (ctx.expr() != null) {
+                visit(ctx.expr())
+            } else {
+                getValueFromBlock(ctx.block())
+            }
             exitScope()
             return@MethodValue result
         }
     }
 
+    override fun visitRunFunctionExpr(ctx: RunFunctionExprContext): Value? {
+        val function = visit(ctx.expr())
+        if (function is MethodValue) {
+            return function.data(ctx.exprList().values())
+        }
+        TODO("Write Proper Exception")
+    }
+
+    private fun ExprListContext.values(): List<Value?> {
+        return this.expr().map { visit(it) }
+    }
+
+    private fun getValueFromBlock(block: BlockContext): Value? {
+        try {
+            visit(block)
+        } catch (returnValue: ReturnValue) {
+            return ReturnValue.value
+        }
+        return null
+    }
 
 
-    override fun visitVarDefinition(ctx: FuncParser.VarDefinitionContext): Value? {
+    override fun visitVarDefinition(ctx: VarDefinitionContext): Value? {
         val idenList = ctx.idenList().IDEN()
         val value = this.visit(ctx.expr())
         if (idenList.size == 1) {
@@ -93,55 +129,211 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         return null
     }
 
-    override fun visitVarModification(ctx: FuncParser.VarModificationContext): Value? {
+    override fun visitVarModification(ctx: VarModificationContext): Value? {
         val type = ctx.op.type
         val oldValue: Value?
         if (type != EQUAL) {
-            val modifiableExpr = ctx.modifiableExpr()
-            val main = this.visit(modifiableExpr.expr(0))
-            if (main == null) {
-                oldValue = memory[modifiableExpr.IDEN().text]
-            } else {
-                TODO("Need to implement object and array setting!")
+            when (val modifiableExpr = ctx.modifiableExpr()) {
+                is ModifiableIdenContext -> {
+                    oldValue = memory[modifiableExpr.IDEN().text]
+                }
+                is ModifiableObjectContext -> {
+                    val main = this.visit(modifiableExpr.expr())
+                    oldValue = if (main?.canChangeProperties == true) {
+                        main.properties[modifiableExpr.IDEN().text]
+                    } else {
+                        TODO("Write Proper Exception")
+                    }
+                }
+                is ModifiableArrayContext -> {
+                    val main = this.visit(modifiableExpr.expr(0))
+                    val key = this.visit(modifiableExpr.expr(1))
+                    oldValue = if (main is ListValue && key is DoubleValue) {
+                        main.data[key.intData]
+                    } else if (key is StringValue) {
+                        if (main?.canChangeProperties == true) {
+                            main.properties[key.data]
+                        } else {
+                            TODO("Write Proper Exception")
+                        }
+                    } else {
+                        TODO("Write Proper Exception")
+                    }
+                }
+                else -> oldValue = null
             }
+        } else {
+            oldValue = null
         }
-        //TODO FIX UP!
+        val rightSide = this.visit(ctx.expr())
+        val result: Value?
         when (type) {
             EQUAL -> {
+                result = null
             }
             PLUSEQ -> {
-
+                result = if (oldValue is DoubleValue && rightSide is DoubleValue)
+                    oldValue + rightSide
+                else if (oldValue is StringValue && rightSide is StringValue)
+                    oldValue + rightSide
+                else
+                    TODO("Write Proper Exception")
             }
             MINUSEQ -> {
-
+                if (oldValue is DoubleValue && rightSide is DoubleValue)
+                    result = oldValue - rightSide
+                else
+                    TODO("Write Proper Exception")
             }
             MULTEQ -> {
-
+                if (oldValue is DoubleValue && rightSide is DoubleValue)
+                    result = oldValue * rightSide
+                else
+                    TODO("Write Proper Exception")
             }
             DIVEQ -> {
-
+                if (oldValue is DoubleValue && rightSide is DoubleValue)
+                    result = oldValue / rightSide
+                else
+                    TODO("Write Proper Exception")
             }
             PLUSPLUS -> {
-
+                if (oldValue is DoubleValue)
+                    result = oldValue.inc()
+                else
+                    TODO("Write Proper Exception")
             }
             MINUSMINUS -> {
+                if (oldValue is DoubleValue)
+                    result = oldValue.dec()
+                else
+                    TODO("Write Proper Exception")
+            }
+            else -> TODO("Write Proper Exception")
+        }
+        when (val modifiableExpr = ctx.modifiableExpr()) {
+            is ModifiableIdenContext -> {
+                memory[modifiableExpr.IDEN().text] = result
+            }
+            is ModifiableObjectContext -> {
+                val main = this.visit(modifiableExpr.expr())
+                if (main?.canChangeProperties == true) {
+                    main.properties[modifiableExpr.IDEN().text] = result
+                } else {
+                    TODO("Write Proper Exception")
+                }
+            }
+            is ModifiableArrayContext -> {
+                val main = this.visit(modifiableExpr.expr(0))
+                val key = this.visit(modifiableExpr.expr(1))
+                if (main is ListValue && key is DoubleValue) {
+                    main.data[key.intData] = result
+                } else if (key is StringValue && main?.canChangeProperties == true) {
+                    main.properties[key.data] = result
+                } else {
+                    TODO("Write Proper Exception")
+                }
+            }
+            else -> TODO("Write Proper Exception")
+        }
+        return null
 
+    }
+
+
+
+    override fun visitBlock(ctx: BlockContext): Value? {
+        enterScope()
+        ctx.statement().forEach { this.visit(it) }
+        if (ctx.endingLine() != null) {
+            this.visit(ctx.endingLine())
+        }
+        exitScope()
+        return null
+    }
+
+    override fun visitEndingLine(ctx: EndingLineContext): Value? {
+        ReturnValue.value = when {
+            ctx.RETURN() != null -> {
+                this.visit(ctx.expr())
+            }
+            ctx.BREAK() != null -> {
+                TODO("create BREAK")
+            }
+            ctx.CONTINUE() != null -> TODO("create CONTINUE")
+            else -> {
+                TODO("Write Proper Exception")
+            }
+        }
+        exitScope()
+        throw ReturnValue
+    }
+
+    override fun visitCommand(ctx: CommandContext): Value? {
+        val command = ctx.commandPart().joinToString(separator = "") { stringVisitor.visit(it) }
+        val current = namespaceStack.peek()
+
+        if (ctx.OPEN_FUNCTION() != null) {
+            val namespaceValue = visit(ctx.expr())
+            if (namespaceValue is StringValue) {
+                val namespace = processNamespace(namespaceValue.data)
+                namespaceStack.add(namespace)
+                this.visit(ctx.statBlock())
+            } else {
+                TODO("Write Proper Exception")
             }
         }
         return null
     }
 
-    private val stringVisitor = StringVisitor()
-    private inner class StringVisitor : FuncParserBaseVisitor<String>() {
-
-
-        override fun visitTextStringPart(ctx: FuncParser.TextStringPartContext): String {
-            return ctx.text
+    private fun processNamespace(namespace: String?): String {
+        val current = namespaceStack.peek()
+        var newNamespace = namespace
+        if (newNamespace.isNullOrBlank()) {
+            var num = 0
+            do {
+                newNamespace = current + "/fun" + num++
+            } while (namespaceStack.contains(newNamespace))
+        }
+        if (newNamespace!![0] == '/') {
+            newNamespace = current + newNamespace
+        }
+        if (!newNamespace.contains(":")) {
+            newNamespace = current.substring(0, max(current.indexOf(':'), current.lastIndexOf('/'))) + newNamespace
         }
 
-        override fun visitEscapeStringPart(ctx: FuncParser.EscapeStringPartContext): String {
-            val c = ctx.text[1]
-            return when (c) {
+        if (!newNamespace.matches(Regex("[a-z_-][a-z\\d_-]*:[a-z_-][a-z\\d_-]*(?:/[a-z_-][a-z\\d_-]*)*")))
+            TODO("Write Proper Exception")
+        return newNamespace
+    }
+
+    private val stringVisitor = StringVisitor()
+
+    private inner class StringVisitor : FuncParserBaseVisitor<String>() {
+
+        override fun visitTextStringPart(ctx: TextStringPartContext): String = ctx.text
+
+        override fun visitCommandText(ctx: CommandTextContext): String = ctx.text.replace("\\$", "$")
+
+        override fun visitThisFunctionPart(ctx: ThisFunctionPartContext?): String = namespaceStack.peek()
+
+        override fun visitCommandGoOnPart(ctx: CommandGoOnPartContext) = " "
+
+        override fun visitCommandExprInterpPart(ctx: CommandExprInterpPartContext) =
+                this@FuncVisitor.visit(ctx.expr()).toString()
+
+        override fun visitFunctionReferencePart(ctx: FunctionReferencePartContext): String {
+            return ctx.stringPart().joinToString("") { visit(it) }
+        }
+
+        override fun visitCommandIdInterpPart(ctx: CommandIdInterpPartContext) =
+                memory[ctx.text.substring(1)].toString()
+
+        override fun visitIdInterpPart(ctx: IdInterpPartContext) =
+                memory[ctx.text.substring(1)].toString()
+
+        override fun visitEscapeStringPart(ctx: EscapeStringPartContext): String {
+            return when (val c = ctx.text[1]) {
                 'r' -> {
                     "\r"
                 }
@@ -157,8 +349,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
             }
         }
 
-        override fun visitExprInterpPart(ctx: FuncParser.ExprInterpPartContext): String {
-            return this@FuncVisitor.visit(ctx.expr()).toString()
-        }
+        override fun visitExprInterpPart(ctx: ExprInterpPartContext) =
+                this@FuncVisitor.visit(ctx.expr()).toString()
     }
 }

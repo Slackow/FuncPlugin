@@ -1,8 +1,13 @@
 package com.slackow.func.parser.value
 
-import java.util.*
 
 abstract class Value(open val type: Type?) {
-    val properties: Map<String, Value> = HashMap()
+    val properties: MutableMap<String, Value?> = HashMap()
     open fun toJsonValue(): String = throw UnsupportedOperationException()
+
+    open val canChangeProperties: Boolean
+        get() {
+            val currentType = type
+            return currentType != null && currentType.canChangeProperties
+        }
 }

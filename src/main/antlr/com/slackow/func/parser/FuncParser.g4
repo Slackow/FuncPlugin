@@ -37,7 +37,7 @@ forLoop: FOR LPAREN first=line? SEMI condition=expr? SEMI last=line? RPAREN stat
 forEachLoop: FOR IDEN (COMMA IDEN)? IN expr statBlock
 | FOR LPAREN IDEN (COMMA IDEN)? IN expr RPAREN statBlock;
 
-command: (OPEN_COMMAND | NEWLINE_COMMAND) commandPart* (OPEN_FUNCTION expr? statBlock | EXIT_COMMAND)?;
+command: (OPEN_COMMAND | NEWLINE_COMMAND) commandPart* (OPEN_FUNCTION expr? block | EXIT_COMMAND)?;
 
 commandPart
 : TEXT_COMMAND  # commandText
@@ -73,9 +73,10 @@ exprList: expr (COMMA expr)*;
 idenList: IDEN (COMMA IDEN)*;
 
 modifiableExpr
-: IDEN
-| expr LBRACKET expr RBRACKET
-| expr DOT IDEN;
+: IDEN #modifiableIden
+| expr LBRACKET expr RBRACKET #modifiableArray
+| expr DOT IDEN #modifiableObject
+;
 
 expr
 : LPAREN expr RPAREN # parExpr
