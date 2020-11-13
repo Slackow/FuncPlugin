@@ -6,7 +6,7 @@ abstract class Type : Value(TypeType) {
 
     override fun toString() = "[$typeName]"
 
-    private object TypeType : Type() {
+    object TypeType : Type() {
         override val typeName: String
             get() = "type"
         override val canChangeProperties: Boolean

@@ -54,8 +54,8 @@ doWhileLoop: DO statBlock WHILE expr SEMI;
 
 ifStatement: IF exprBlock (ELSE statBlock)?;
 
-defineFunctionStatement: FUNCTION IDEN LPAREN idenList? RPAREN statBlock;
-defineInstanceFunctionStatement: FUNCTION expr DOT IDEN LPAREN idenList? RPAREN statBlock;
+defineFunctionStatement: FUNCTION IDEN LPAREN idenList? RPAREN block;
+defineInstanceFunctionStatement: FUNCTION expr DOT IDEN LPAREN idenList? RPAREN block;
 
 varDefinition: VAR idenList EQUAL expr;
 
@@ -80,22 +80,22 @@ modifiableExpr
 
 expr
 : LPAREN expr RPAREN # parExpr
-| expr LBRACKET expr RBRACKET # getItemExpr
-| expr LBRACKET expr COLON expr (COLON expr)? RBRACKET # subExpr
-| expr QUESTION? DOT IDEN # getObjectExpr
+| main=expr LBRACKET key=expr RBRACKET # getItemExpr
+| main=expr LBRACKET start=expr? COLON end=expr? (COLON inc=expr)? RBRACKET # subExpr
+| main=expr QUESTION? DOT key=IDEN # getObjectExpr
 | expr LPAREN exprList? RPAREN # runFunctionExpr
 | MINUS expr # negationExpr
 | NOT expr # notExpr
 | TYPEOF expr # typeOfExpr
-| expr ELVIS expr # elvisExpr
-| <assoc=right> expr POW expr # powExpr
-| expr op=(MULT | DIV | MOD) expr # multExpr
-| expr op=(PLUS | MINUS) expr # addExpr
-| expr op=(LT | LE | GT | GE) expr # relationalExpr
-| expr op=(EQ | NE) expr # equalityExpr
-| expr IS expr # isExpr
-| expr AND expr # andExpr
-| expr OR expr # orExpr
+| left=expr ELVIS right=expr # elvisExpr
+| <assoc=right> left=expr POW right=expr # powExpr
+| left=expr op=(MULT | DIV | MOD) right=expr # multExpr
+| left=expr op=(PLUS | MINUS) right=expr # addExpr
+| left=expr op=(LT | LE | GT | GE) right=expr # relationalExpr
+| left=expr op=(EQ | NE) right=expr # equalityExpr
+| left=expr IS right=expr # isExpr
+| left=expr AND right=expr # andExpr
+| left=expr OR right=expr # orExpr
 | condition=expr QUESTION left=expr COLON right=expr # ternaryExpr
 
 | (IDEN | LPAREN idenList RPAREN) ARROW (expr | block) # lambdaAtom
