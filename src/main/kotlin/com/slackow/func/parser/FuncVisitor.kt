@@ -128,7 +128,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
     override fun visitRunFunctionExpr(ctx: RunFunctionExprContext): Value? {
         val function = visit(ctx.expr())
         if (function is MethodValue) {
-            return function.data(ctx.exprList().values())
+            return function(ctx.exprList().values())
         }
         TODO("Write Proper Exception")
     }
@@ -332,7 +332,6 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
             if (namespaceValue is StringValue) {
                 val namespace = processNamespace(namespaceValue.data)
                 namespaceStack.add(namespace)
-
                 this.visit(ctx.block())
             } else {
                 TODO("Write Proper Exception")
@@ -383,6 +382,26 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 MOD -> left % right
                 else -> TODO("Write Proper Exception")
             }
+        TODO("Write Proper Exception")
+    }
+
+    override fun visitSubExpr(ctx: SubExprContext): Value? {
+        val start = visit(ctx.start)
+        val end = visit(ctx.end)
+        if (start is DoubleValue && end is DoubleValue) {
+            val inc = visit(ctx.inc) ?: DoubleValue(if (start.data <= end.data) 1.0 else -1.0)
+
+
+
+            val main = visit(ctx.main)
+            if (main is ListValue) {
+
+            }
+        } else {
+
+        }
+
+
         TODO("Write Proper Exception")
     }
 
@@ -465,7 +484,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
     override fun visitFunctionCallLine(ctx: FunctionCallLineContext): Value? {
         val function = visit(ctx.expr())
         if (function is MethodValue) {
-            function.data(ctx.exprList().values())
+            function(ctx.exprList().values())
         } else {
             TODO("Write Proper Exception")
         }
@@ -479,6 +498,47 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         return null
     }
 
+    override fun visitIfStatement(ctx: IfStatementContext): Value? {
+        val condition = visit(ctx.exprBlock().expr())
+        if (condition is BooleanValue) {
+            if (condition.data) {
+                visit(ctx.exprBlock().statBlock())
+            } else if (ctx.ELSE() != null) {
+                visit(ctx.statBlock())
+            }
+        } else {
+            TODO("Write Proper Exception")
+        }
+        return null
+    }
+
+    override fun visitForLoop(ctx: ForLoopContext): Value? {
+        visit(ctx.first)
+        while ((visit(ctx.condition) as? BooleanValue ?: TODO("Write Proper Exception")).data){
+            visit(ctx.statBlock())
+        }
+        visit(ctx.last)
+        return null
+    }
+
+    override fun visitNullAtom(ctx: NullAtomContext?): Value? {
+        TODO("Implement Null Values")
+    }
+
+
+    override fun visitWhileLoop(ctx: WhileLoopContext): Value? {
+        while ((visit(ctx.exprBlock().expr()) as? BooleanValue ?: TODO("Write Proper Exception")).data) {
+            visit(ctx.exprBlock().statBlock())
+        }
+        return null
+    }
+
+    override fun visitDoWhileLoop(ctx: DoWhileLoopContext): Value? {
+        do {
+            visit(ctx.statBlock())
+        } while ((visit(ctx.expr()) as? BooleanValue ?: TODO("Write Proper Exception")).data)
+        return null
+    }
 
     private inner class StringVisitor : FuncParserBaseVisitor<String>() {
 

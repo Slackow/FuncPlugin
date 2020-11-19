@@ -22,6 +22,8 @@ class DoubleValue(val data: Double) : Value(DoubleType) {
 
     operator fun rem(that: DoubleValue) = DoubleValue(this.data % that.data)
 
+    operator fun compareTo(that: DoubleValue) = this.data.compareTo(that.data)
+
     operator fun inc() = DoubleValue(this.data + 1)
 
     operator fun dec() = DoubleValue(this.data - 1)
