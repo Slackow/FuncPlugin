@@ -8,8 +8,9 @@ class DoubleValue(val data: Double) : Value(DoubleType) {
     override fun toJsonValue() = toString()
 
     override fun toString(): String {
-        val string = data.toString()
-        return if (string.endsWith(".0")) string.substring(0, string.length-2) else string
+        val toInt = data.toInt()
+        return if (toInt.toDouble() == data)
+            toInt.toString() else data.toString()
     }
 
     operator fun plus(that: DoubleValue) = DoubleValue(this.data + that.data)

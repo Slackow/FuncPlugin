@@ -10,6 +10,7 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.ParseTree
 import java.lang.Integer.max
+import java.nio.file.Paths
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.math.pow
@@ -20,6 +21,8 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
 
     init {
         namespaceStack.add("")
+        memory[SystemValue.typeName] = SystemValue
+        memory[MathValue.typeName] = MathValue
     }
 
     private fun enterScope() {
@@ -40,12 +43,13 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
                 |};
                 |var c = a.b;
                 |var d = a["rolf a"];
+                |System.println("${"$"}c yep :)))");
                 |""".trimMargin()
             val charStream = CharStreams.fromString(text)
             val funcLexer = FuncLexer(charStream)
             val tokens = CommonTokenStream(funcLexer)
             val funcParser = FuncParser(tokens)
-            val visitor = FuncVisitor(this)
+            val visitor = FuncVisitor(Datapack("Example", Paths.get(".")))
             visitor.visit(funcParser.program())
         }
     }
