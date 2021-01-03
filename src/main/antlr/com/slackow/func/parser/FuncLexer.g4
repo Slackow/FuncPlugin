@@ -50,7 +50,7 @@ COLON: ':';
 COMMA: ',';
 ARROW: '->';
 
-OPEN_STRING: '\'' -> pushMode(STRING);
+OPEN_STRING: '"' -> pushMode(STRING);
 OPEN_COMMAND: NEWLINE WS? '/' -> pushMode(COMMAND);
 OPEN_MULTI_COMMAND: NEWLINE WS? '/:' (NEWLINE | WS)* -> pushMode(MULTI_LINE_COMMAND), type(OPEN_COMMAND);
 
@@ -68,7 +68,6 @@ IF: 'if';
 IN: 'in';
 IS: 'is';
 FUNCTION: 'function';
-NULL: 'null';
 NEW: 'new';
 RETURN: 'return';
 SWITCH: 'switch';
@@ -96,8 +95,9 @@ EXPR_INTERP: '${' -> pushMode(DEFAULT_MODE);
 ID_INTERP: '$' IDEN;
 
 ESCAPE: '\\' (["'\\$rn] | 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT);
+
 fragment HEX_DIGIT: [0-9a-fA-F];
-TEXT: (~[$\r\n\\']+) | '$';
+TEXT: (~[$\r\n\\"]+) | '$';
 
 CLOSE_STRING: OPEN_STRING -> popMode;
 ERR_TOKEN_STRING: . -> channel(HIDDEN);

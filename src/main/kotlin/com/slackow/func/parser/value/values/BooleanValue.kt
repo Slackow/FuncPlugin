@@ -18,7 +18,7 @@ class BooleanValue private constructor(val data: Boolean) : Value(BooleanType) {
 
     object BooleanType : Type() {
         override val typeName: String
-            get() = "boolean"
+            get() = "Boolean"
         override val canChangeProperties: Boolean
             get() = false
     }

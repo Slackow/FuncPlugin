@@ -7,7 +7,7 @@ class ObjectValue : Value(ObjectType) {
 
     private object ObjectType : Type() {
         override val typeName: String
-            get() = "object"
+            get() = "Object"
         override val canChangeProperties: Boolean
             get() = true
 

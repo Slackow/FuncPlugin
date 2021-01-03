@@ -38,7 +38,7 @@ class DoubleValue(val data: Double) : Value(DoubleType) {
 
     object DoubleType : Type() {
         override val typeName: String
-            get() = "double"
+            get() = "Double"
         override val canChangeProperties: Boolean
             get() = false
     }

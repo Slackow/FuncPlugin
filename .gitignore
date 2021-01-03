@@ -2,3 +2,4 @@
 gen
 build
 /.gradle/
+/src/main/antlr/com/slackow/func/parser/FuncLexer.tokens

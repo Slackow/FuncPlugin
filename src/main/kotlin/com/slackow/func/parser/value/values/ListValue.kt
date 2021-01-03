@@ -10,9 +10,14 @@ class ListValue(val data: MutableList<Value?>) : Value(ListType) {
     override fun toJsonValue() = "[${data.joinToString(",") { it?.toJsonValue() ?: "undefined" }}]"
 
     override fun toString() = data.toString()
+    operator fun get(i: Int) = data[i]
+
+    operator fun set(i: Int, value: Value?) = data.set(i, value)
+
+
     object ListType : Type() {
         override val typeName: String
-            get() = "list"
+            get() = "List"
         override val canChangeProperties: Boolean
             get() = false
     }

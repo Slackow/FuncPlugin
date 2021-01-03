@@ -32,9 +32,9 @@ statBlock: block | statement | endingLine;
 
 block: LBRACE statement* endingLine? RBRACE;
 
-forLoop: FOR LPAREN first=line? SEMI condition=expr? SEMI last=line? RPAREN statBlock;
+forLoop: (label=IDEN COLON)? FOR LPAREN first=line? SEMI condition=expr? SEMI last=line? RPAREN statBlock;
 
-forEachLoop: FOR IDEN (COMMA IDEN)? IN expr statBlock
+forEachLoop: (label=IDEN COLON)? FOR IDEN (COMMA IDEN)? IN expr statBlock
 | FOR LPAREN IDEN (COMMA IDEN)? IN expr RPAREN statBlock;
 
 command: (OPEN_COMMAND | NEWLINE_COMMAND) commandPart* (OPEN_FUNCTION expr? block | EXIT_COMMAND)?;
@@ -48,9 +48,9 @@ commandPart
 | THIS_FUNCTION  # thisFunctionPart
 ;
 
-whileLoop: WHILE exprBlock;
+whileLoop: (label=IDEN COLON)? WHILE exprBlock;
 
-doWhileLoop: DO statBlock WHILE expr SEMI;
+doWhileLoop: (label=IDEN COLON)? DO statBlock WHILE expr SEMI;
 
 ifStatement: IF exprBlock (ELSE statBlock)?;
 
@@ -103,7 +103,6 @@ expr
 | LBRACKET exprList? RBRACKET # listAtom
 | string # stringAtom
 | NUM # numAtom
-| NULL # nullAtom
 | UNDEFINED #undefinedAtom
 | THIS # thisAtom
 | BOOL # boolAtom

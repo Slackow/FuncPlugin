@@ -7,13 +7,14 @@ import com.slackow.func.parser.value.Value
 import com.slackow.func.parser.value.values.*
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.ParseTree
 import java.lang.Integer.max
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.math.pow
 
-class FuncVisitor : FuncParserBaseVisitor<Value?>() {
+class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
     var memory: Scope<Value?> = Scope()
     private val namespaceStack = Stack<String>()
 
@@ -26,19 +27,25 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
     }
 
     private fun exitScope() {
-        val parent = memory.parent ?: TODO("Write Proper Exception")
-        memory = parent
+        memory = memory.parent ?: error("exited scope when there was no parent?")
     }
 
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
-            val text = "var a = 1;var b = true;"
+            val text = """var a = 1;
+                |var a = {
+                |   b: "Dream Cheated",
+                |   "rolf a": 1232409879
+                |};
+                |var c = a.b;
+                |var d = a["rolf a"];
+                |""".trimMargin()
             val charStream = CharStreams.fromString(text)
             val funcLexer = FuncLexer(charStream)
             val tokens = CommonTokenStream(funcLexer)
             val funcParser = FuncParser(tokens)
-            val visitor = FuncVisitor()
+            val visitor = FuncVisitor(this)
             visitor.visit(funcParser.program())
         }
     }
@@ -66,7 +73,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
 
     override fun visitObjectAtom(ctx: ObjectAtomContext): Value? {
         val result = ObjectValue()
-        ctx.objectPart().forEach { result.properties[it.IDEN().text] = visit(it.expr()) }
+        ctx.objectPart().forEach { result.properties[it.IDEN()?.text ?: stringVisitor.visit(it.string())] = visit(it.expr()) }
         return result
     }
 
@@ -92,13 +99,13 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 if (type.properties[key] == null) {
                     type.properties[key] = methodValue(ctx.idenList().IDEN().map { it.text }, ctx.block())
                 } else {
-                    TODO("Write Proper Exception")
+                    error(ctx, "Property Already Defined for " + type.typeName)
                 }
             } else {
-                TODO("Write Proper Exception")
+                error(ctx, "Type cannot change properties")
             }
         } else {
-            TODO("Write Proper Exception")
+            error(ctx, "Class not found: $type")
         }
         return null
     }
@@ -111,7 +118,9 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
     private fun methodValue(idens: List<String>, block: BlockContext? = null, expr: ExprContext? = null): MethodValue {
         return MethodValue { input ->
             enterScope()
-            if (input.size != idens.size) TODO("Throw Proper Exception")
+            if (input.size != idens.size) {
+                throw RuntimeException("inputs are not the same size as argument length for $this")
+            }
             for ((i, parameter) in idens.withIndex()) {
                 memory[parameter] = input[i]
             }
@@ -130,7 +139,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         if (function is MethodValue) {
             return function(ctx.exprList().values())
         }
-        TODO("Write Proper Exception")
+        error(ctx, "Not a function: $function")
     }
 
     private fun ExprListContext.values(): List<Value?> {
@@ -160,7 +169,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                     memory.setDirect(iden.text, list[i])
                 }
             } else {
-                throw RuntimeException() //TODO make a proper exception
+                error(ctx, "excepted list: $value")
             }
         }
         return null
@@ -179,22 +188,26 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                     oldValue = if (main?.canChangeProperties == true) {
                         main.properties[modifiableExpr.IDEN().text]
                     } else {
-                        TODO("Write Proper Exception")
+                        error(ctx, "value is not modifiable: $main")
                     }
                 }
                 is ModifiableArrayContext -> {
                     val main = this.visit(modifiableExpr.expr(0))
                     val key = this.visit(modifiableExpr.expr(1))
                     oldValue = if (main is ListValue && key is DoubleValue) {
-                        main.data[key.intData]
+                        main[key.intData]
                     } else if (key is StringValue) {
                         if (main?.canChangeProperties == true) {
                             main.properties[key.data]
                         } else {
-                            TODO("Write Proper Exception")
+                            error(ctx, "value cannot change properties: $main")
                         }
                     } else {
-                        TODO("Write Proper Exception")
+                        error(ctx, "key is not correct type or main is not correct type: ${typeName(main)}[${
+                            typeName(
+                                key
+                            )
+                        }]")
                     }
                 }
                 else -> oldValue = null
@@ -214,39 +227,39 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 else if (oldValue is StringValue && rightSide is StringValue)
                     oldValue + rightSide
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "values must be strings or numbers")
             }
             MINUSEQ -> {
                 if (oldValue is DoubleValue && rightSide is DoubleValue)
                     result = oldValue - rightSide
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "values must be numbers")
             }
             MULTEQ -> {
                 if (oldValue is DoubleValue && rightSide is DoubleValue)
                     result = oldValue * rightSide
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "values must be numbers")
             }
             DIVEQ -> {
                 if (oldValue is DoubleValue && rightSide is DoubleValue)
                     result = oldValue / rightSide
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "values must be numbers")
             }
             PLUSPLUS -> {
                 if (oldValue is DoubleValue)
                     result = oldValue.inc()
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "value must be a number")
             }
             MINUSMINUS -> {
                 if (oldValue is DoubleValue)
                     result = oldValue.dec()
                 else
-                    TODO("Write Proper Exception")
+                    error(ctx, "value must be a number")
             }
-            else -> TODO("Write Proper Exception")
+            else -> error(ctx, "Unknown Operator: ${ctx.op.text}")
         }
         when (val modifiableExpr = ctx.modifiableExpr()) {
             is ModifiableIdenContext -> {
@@ -257,21 +270,21 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 if (main?.canChangeProperties == true) {
                     main.properties[modifiableExpr.IDEN().text] = result
                 } else {
-                    TODO("Write Proper Exception")
+                    error(ctx, "object cannot change properties $main")
                 }
             }
             is ModifiableArrayContext -> {
                 val main = this.visit(modifiableExpr.expr(0))
                 val key = this.visit(modifiableExpr.expr(1))
                 if (main is ListValue && key is DoubleValue) {
-                    main.data[key.intData] = result
+                    main[key.intData] = result
                 } else if (key is StringValue && main?.canChangeProperties == true) {
                     main.properties[key.data] = result
                 } else {
-                    TODO("Write Proper Exception")
+                    error(ctx, "bad type match: ${typeName(main)}[${typeName(key)}]")
                 }
             }
-            else -> TODO("Write Proper Exception")
+            else -> error(ctx, "invalid modifiable expression")
         }
         return null
 
@@ -293,12 +306,10 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
             ctx.RETURN() != null -> {
                 this.visit(ctx.expr())
             }
-            ctx.BREAK() != null -> {
-                TODO("create BREAK")
-            }
-            ctx.CONTINUE() != null -> TODO("create CONTINUE")
+            ctx.BREAK() != null -> NoValue.BREAK
+            ctx.CONTINUE() != null -> NoValue.CONTINUE
             else -> {
-                TODO("Write Proper Exception")
+                error(ctx, "invalid ending line")
             }
         }
         exitScope()
@@ -307,40 +318,40 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
 
     override fun visitNotExpr(ctx: NotExprContext): Value? {
         val value = visit(ctx.expr())
-        return BooleanValue.of(!((value as? BooleanValue)?.data ?: TODO("Write Proper Exception")))
+        return BooleanValue.of(!((value as? BooleanValue)?.data ?: error(ctx, "not a boolean: $value")))
     }
 
     override fun visitAndExpr(ctx: AndExprContext): Value? {
         return BooleanValue.of(
-                (visit(ctx.left) as? BooleanValue)?.data ?: TODO("Write proper exception")
-                        && (visit(ctx.right) as? BooleanValue)?.data ?: TODO("Write proper exception"))
+                (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
+                        && (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean"))
     }
 
     override fun visitOrExpr(ctx: OrExprContext): Value? {
         return BooleanValue.of(
-                (visit(ctx.left) as? BooleanValue)?.data ?: TODO("Write proper exception")
-                        || (visit(ctx.right) as? BooleanValue)?.data ?: TODO("Write proper exception")
+                (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
+                        || (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
         )
     }
 
     override fun visitCommand(ctx: CommandContext): Value? {
-        val command = ctx.commandPart().joinToString(separator = "") { stringVisitor.visit(it) }
+        val command = ctx.commandPart().joinToString("") { stringVisitor.visit(it) }
         val current = namespaceStack.peek()
 
         if (ctx.OPEN_FUNCTION() != null) {
             val namespaceValue = visit(ctx.expr())
             if (namespaceValue is StringValue) {
-                val namespace = processNamespace(namespaceValue.data)
+                val namespace = processNamespace(namespaceValue.data, ctx)
                 namespaceStack.add(namespace)
                 this.visit(ctx.block())
             } else {
-                TODO("Write Proper Exception")
+                error(ctx, "functionName is not a string: $namespaceValue")
             }
         }
         return null
     }
 
-    private fun processNamespace(namespace: String?): String {
+    private fun processNamespace(namespace: String?, ctx: ParserRuleContext): String {
         val current = namespaceStack.peek()
         var newNamespace = namespace
         if (newNamespace.isNullOrBlank()) {
@@ -357,8 +368,12 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         }
 
         if (!newNamespace.matches(Regex("[a-z_-][a-z\\d_-]*:[a-z_-][a-z\\d_-]*(?:/[a-z_-][a-z\\d_-]*)*")))
-            TODO("Write Proper Exception")
+            error(ctx, "")
         return newNamespace
+    }
+
+    private fun error(ctx: ParserRuleContext, msg: String = ""): Nothing {
+        throw RuntimeException("$msg line: ${ctx.start.line}")
     }
 
     private val stringVisitor = StringVisitor()
@@ -369,7 +384,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         if (left is DoubleValue && right is DoubleValue) {
             return DoubleValue(left.data.pow(right.data))
         }
-        TODO("Write Proper Exception")
+        error(ctx, "bad type match: ${typeName(left)} ^ ${typeName(right)}")
     }
 
     override fun visitMultExpr(ctx: MultExprContext): Value? {
@@ -380,30 +395,69 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 MULT -> left * right
                 DIV -> left / right
                 MOD -> left % right
-                else -> TODO("Write Proper Exception")
+                else -> error(ctx, "unknown operator: ${ctx.op.text}")
             }
-        TODO("Write Proper Exception")
+        error(ctx, "bad type match: ${typeName(left)} ${ctx.op.text} ${typeName(right)}")
     }
 
     override fun visitSubExpr(ctx: SubExprContext): Value? {
-        val start = visit(ctx.start)
-        val end = visit(ctx.end)
+        val start = visit(ctx.start) ?: DoubleValue(0.0)
+        val end = visit(ctx.end) ?: DoubleValue(1.0)
         if (start is DoubleValue && end is DoubleValue) {
             val inc = visit(ctx.inc) ?: DoubleValue(if (start.data <= end.data) 1.0 else -1.0)
 
-
-
-            val main = visit(ctx.main)
-            if (main is ListValue) {
-
+            if (inc !is DoubleValue) {
+                error(ctx, "increment needs to be number, not ${typeName(inc)}")
+            }
+            when (val main = visit(ctx.main)) {
+                is ListValue -> {
+                    when (inc.intData) {
+                        1 -> {
+                            return ListValue(main.data.subList(start.intData, end.intData))
+                        }
+                        -1 -> {
+                            return ListValue(main.data.subList(end.intData, start.intData).asReversed())
+                        }
+                        else -> {
+                            val result = ListValue()
+                            var i = start.intData
+                            while (i < end.intData) {
+                                result[i] = main[i]
+                                i+=inc.intData
+                            }
+                            return result
+                        }
+                    }
+                }
+                is StringValue -> {
+                    when (inc.intData) {
+                        1 -> {
+                            return StringValue(main.data.substring(start.intData, end.intData))
+                        }
+                        -1 -> {
+                            return StringValue(main.data.substring(end.intData, start.intData).reversed())
+                        }
+                        else -> {
+                            var i = start.intData
+                            val result = StringBuilder()
+                            while (i < end.intData) {
+                                result[i] = main.data[i]
+                                i+=inc.intData
+                            }
+                            return StringValue(result.toString())
+                        }
+                    }
+                }
+                else -> {
+                    error(ctx, "bad type : ${typeName(main)}")
+                }
             }
         } else {
-
+            error(ctx, "bad type match: [${typeName(start)}:${typeName(end)}]")
         }
-
-
-        TODO("Write Proper Exception")
     }
+
+    private fun typeName(main: Value?) = main?.type?.typeName
 
     override fun visitAddExpr(ctx: AddExprContext): Value? {
         val left = visit(ctx.left)
@@ -415,22 +469,23 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 } else if (left is StringValue && right is StringValue) {
                     left + right
                 } else {
-                    TODO("Write proper exception")
+                    error(ctx, "bad type match: ${typeName(left)} + ${typeName(right)}")
                 }
             }
             MINUS -> {
                 if (left is DoubleValue && right is DoubleValue) {
                     left - right
                 } else {
-                    TODO("Write proper exception")
+                    error(ctx, "bad type match: ${typeName(left)} - ${typeName(right)}")
                 }
             }
-            else -> TODO("Write proper exception")
+            else -> error(ctx, "Unknown operator: ${ctx.op.text}")
         }
     }
 
     override fun visitNegationExpr(ctx: NegationExprContext): Value? {
-        return DoubleValue(-((visit(ctx.expr()) as? DoubleValue)?.data ?: TODO("Write Proper Exception")))
+        val main = visit(ctx.expr())
+        return DoubleValue(-((main as? DoubleValue)?.data ?: error(ctx, "bad type match: -${typeName(main)}")))
     }
 
     override fun visitElvisExpr(ctx: ElvisExprContext): Value? {
@@ -450,10 +505,10 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 GT -> BooleanValue.of(left.data > right.data)
                 LE -> BooleanValue.of(left.data <= right.data)
                 GE -> BooleanValue.of(left.data >= right.data)
-                else -> TODO("Write Proper Exception")
+                else -> error(ctx, "Unknown Operator: ${ctx.op.text}")
             }
         }
-        TODO("Write Proper Exception")
+        error(ctx, "bad type match: ${typeName(left)} ${ctx.op.text} ${typeName(right)}")
     }
 
     override fun visitEqualityExpr(ctx: EqualityExprContext): Value? {
@@ -468,16 +523,17 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         } else if (main != null && key is StringValue) {
             return main.properties[key.data]
         }
-        TODO("Write Proper Exception")
+        error(ctx, "bad type match: ${typeName(main)}[${typeName(key)}]")
     }
 
     override fun visitGetObjectExpr(ctx: GetObjectExprContext): Value? {
-        val main = visit(ctx.main) ?: TODO("Write Proper Exception")
+        val main = visit(ctx.main) ?: error(ctx, "cannot get properties from null")
         return main.properties[ctx.key.text]
     }
 
     override fun visitTernaryExpr(ctx: TernaryExprContext): Value? {
-        val condition = (visit(ctx.condition) as? BooleanValue)?.data ?: TODO("Write Proper Exception")
+        val conditionValue = visit(ctx.condition)
+        val condition = (conditionValue as? BooleanValue)?.data ?: error(ctx, "bad type match: ${typeName(conditionValue)} ? any : any")
         return visit(if (condition) ctx.left else ctx.right)
     }
 
@@ -486,13 +542,14 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
         if (function is MethodValue) {
             function(ctx.exprList().values())
         } else {
-            TODO("Write Proper Exception")
+            error(ctx, "bad type match ${typeName(function)}(parameters)")
         }
         return null
     }
 
     override fun visitAssertLine(ctx: AssertLineContext): Value? {
-        if (!(visit(ctx.expr()) as? BooleanValue ?: TODO("Write Proper Exception")).data) {
+        val value = visit(ctx.expr())
+        if (!(value as? BooleanValue ?: error(ctx, "bad type: $value")).data) {
             throw AssertionError()
         }
         return null
@@ -507,27 +564,23 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                 visit(ctx.statBlock())
             }
         } else {
-            TODO("Write Proper Exception")
+            error(ctx, "bad type match: if (${typeName(condition)}) block")
         }
         return null
     }
 
     override fun visitForLoop(ctx: ForLoopContext): Value? {
         visit(ctx.first)
-        while ((visit(ctx.condition) as? BooleanValue ?: TODO("Write Proper Exception")).data){
+        while ((visit(ctx.condition) as? BooleanValue ?: error(ctx, "condition is not a boolean")).data){
             visit(ctx.statBlock())
         }
         visit(ctx.last)
         return null
     }
 
-    override fun visitNullAtom(ctx: NullAtomContext?): Value? {
-        TODO("Implement Null Values")
-    }
-
 
     override fun visitWhileLoop(ctx: WhileLoopContext): Value? {
-        while ((visit(ctx.exprBlock().expr()) as? BooleanValue ?: TODO("Write Proper Exception")).data) {
+        while ((visit(ctx.exprBlock().expr()) as? BooleanValue ?: error(ctx, "condition is not a boolean")).data) {
             visit(ctx.exprBlock().statBlock())
         }
         return null
@@ -536,7 +589,7 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
     override fun visitDoWhileLoop(ctx: DoWhileLoopContext): Value? {
         do {
             visit(ctx.statBlock())
-        } while ((visit(ctx.expr()) as? BooleanValue ?: TODO("Write Proper Exception")).data)
+        } while ((visit(ctx.expr()) as? BooleanValue ?: error(ctx, "condition is not a boolean")).data)
         return null
     }
 
@@ -578,6 +631,10 @@ class FuncVisitor : FuncParserBaseVisitor<Value?>() {
                     c.toString()
                 }
             }
+        }
+
+        override fun visitString(ctx: StringContext): String {
+            return ctx.stringPart().joinToString ("") { visit(it) }
         }
 
         override fun visitExprInterpPart(ctx: ExprInterpPartContext) =
