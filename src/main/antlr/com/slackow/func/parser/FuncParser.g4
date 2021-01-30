@@ -1,6 +1,6 @@
 parser grammar FuncParser;
 options {tokenVocab = FuncLexer;}
-program: statement* EOF;
+program: importLine* statement* EOF;
 
 statement
 : line SEMI
@@ -103,12 +103,14 @@ expr
 | LBRACKET exprList? RBRACKET # listAtom
 | string # stringAtom
 | NUM # numAtom
-| UNDEFINED #undefinedAtom
+| UNDEFINED # undefinedAtom
 | THIS # thisAtom
 | BOOL # boolAtom
 | IDEN # varAtom
 ;
-
+// import mw:raycast/Functions as Raycast;
+importLine: IMPORT importMeat (AS alais=IDEN)? SEMI;
+importMeat: (namespace=IDEN COLON)? (IDEN DIV)* name=IDEN;
 objectPart: (IDEN | string) COLON expr;
 
 string: OPEN_STRING stringPart* CLOSE_STRING;

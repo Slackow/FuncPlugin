@@ -1,0 +1,18 @@
+#import mw:raycast/deeper/Functions as rc;
+#import Test;
+#import MW:a;
+var a = 1;
+var a = {
+   b: "Dream Cheated",
+   "rolf a": 1232409879
+};
+var c = a.b;
+var d = a["rolf a"];
+/execute as @a run $function "mc:test" {
+   /this belongs in mc:test
+   gen function "mc:wow" {
+       /belongs in mw:wow
+   }
+   /aftermath (mc:test)
+}
+/aftermath (root)

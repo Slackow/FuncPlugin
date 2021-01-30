@@ -5,24 +5,21 @@ import com.slackow.func.parser.value.ReturnValue
 import com.slackow.func.parser.value.Type
 import com.slackow.func.parser.value.Value
 import com.slackow.func.parser.value.values.*
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.ParseTree
 import java.lang.Integer.max
 import java.nio.file.Paths
 import java.util.*
 import java.util.stream.Collectors
+import kotlin.collections.HashMap
 import kotlin.math.pow
 
-class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
+class FuncVisitor(private val parent: Datapack, location: String) : FuncParserBaseVisitor<Value?>() {
     var memory: Scope<Value?> = Scope()
     private val namespaceStack = Stack<String>()
 
     init {
-        namespaceStack.add("")
-        memory[SystemValue.typeName] = SystemValue
-        memory[MathValue.typeName] = MathValue
+        namespaceStack.add(location)
     }
 
     private fun enterScope() {
@@ -36,21 +33,31 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
-            val text = """var a = 1;
-                |var a = {
-                |   b: "Dream Cheated",
-                |   "rolf a": 1232409879
-                |};
-                |var c = a.b;
-                |var d = a["rolf a"];
-                |System.println("${"$"}c yep :)))");
-                |""".trimMargin()
-            val charStream = CharStreams.fromString(text)
-            val funcLexer = FuncLexer(charStream)
-            val tokens = CommonTokenStream(funcLexer)
-            val funcParser = FuncParser(tokens)
-            val visitor = FuncVisitor(Datapack("Example", Paths.get(".")))
-            visitor.visit(funcParser.program())
+           // val d = "$"
+//            val text = """
+//                |#import mw:raycast/deeper/Functions as rc;
+//                |#import Test;
+//                |#import MW:a;
+//                |var a = 1;
+//                |var a = {
+//                |   b: "Dream Cheated",
+//                |   "rolf a": 1232409879
+//                |};
+//                |var c = a.b;
+//                |var d = a["rolf a"];
+//                |/execute as @a run ${d}function "mc:test" {
+//                |   /this belongs in mc:test
+//                |   gen function "mc:wow" {
+//                |       /belongs in mw:wow
+//                |   }
+//                |   /aftermath (mc:test)
+//                |}
+//                |/aftermath (root)
+//                |
+//                |""".trimMargin()
+            val parent = Datapack("TestDatapack")
+            parent.collect(Paths.get("src/testfiles/TestDatapack"))
+            parent.writeOutput(Paths.get("src/testfiles/output"))
         }
     }
 
@@ -71,17 +78,18 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
 
     override fun visitStringAtom(ctx: StringAtomContext) = visit(ctx.string())
 
-    override fun visitListAtom(ctx: ListAtomContext): Value? {
+    override fun visitListAtom(ctx: ListAtomContext): Value {
         return ListValue(ctx.exprList().expr().map { this.visit(it) }.toMutableList())
     }
 
-    override fun visitObjectAtom(ctx: ObjectAtomContext): Value? {
+    override fun visitObjectAtom(ctx: ObjectAtomContext): Value {
         val result = ObjectValue()
-        ctx.objectPart().forEach { result.properties[it.IDEN()?.text ?: stringVisitor.visit(it.string())] = visit(it.expr()) }
+        ctx.objectPart()
+            .forEach { result.properties[it.IDEN()?.text ?: stringVisitor.visit(it.string())] = visit(it.expr()) }
         return result
     }
 
-    override fun visitString(ctx: StringContext): Value? {
+    override fun visitString(ctx: StringContext): Value {
         return StringValue(ctx.stringPart().stream().map(stringVisitor::visit).collect(Collectors.joining()))
     }
 
@@ -91,9 +99,11 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         return null
     }
 
-    override fun visitTypeOfExpr(ctx: TypeOfExprContext): Value? {
+    override fun visitTypeOfExpr(ctx: TypeOfExprContext): Value {
         return visit(ctx.expr())?.type ?: Type.TypeType
     }
+
+
 
     override fun visitDefineInstanceFunctionStatement(ctx: DefineInstanceFunctionStatementContext): Value? {
         val type = visit(ctx.expr())
@@ -114,7 +124,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         return null
     }
 
-    override fun visitLambdaAtom(ctx: LambdaAtomContext): Value? {
+    override fun visitLambdaAtom(ctx: LambdaAtomContext): Value {
         val list = (ctx.idenList()?.IDEN() ?: listOf(ctx.IDEN())).map { it.text }
         return methodValue(list, ctx.block(), ctx.expr())
     }
@@ -156,6 +166,17 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         } catch (returnValue: ReturnValue) {
             return ReturnValue.value
         }
+        return null
+    }
+
+    override fun visitImportLine(ctx: ImportLineContext): Value? {
+        val name = (ctx.alais ?: ctx.importMeat().name).text
+        //TODO("yeah fix this area")
+        val loc = if (ctx.importMeat().namespace != null)
+            "${ctx.importMeat().text.replace(":", "/sources/")}.mcfslib"
+        else "${namespaceStack[0].apply { substring(0, indexOf(':')) }}/sources/${ctx.importMeat().text}.mcfslib"
+        println("imported $loc as $name")
+        memory[name] = null
         return null
     }
 
@@ -320,26 +341,26 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         throw ReturnValue
     }
 
-    override fun visitNotExpr(ctx: NotExprContext): Value? {
+    override fun visitNotExpr(ctx: NotExprContext): Value {
         val value = visit(ctx.expr())
         return BooleanValue.of(!((value as? BooleanValue)?.data ?: error(ctx, "not a boolean: $value")))
     }
 
-    override fun visitAndExpr(ctx: AndExprContext): Value? {
+    override fun visitAndExpr(ctx: AndExprContext): Value {
         return BooleanValue.of(
-                (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
-                        && (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean"))
+            (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
+                    && (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean"))
     }
 
-    override fun visitOrExpr(ctx: OrExprContext): Value? {
+    override fun visitOrExpr(ctx: OrExprContext): Value {
         return BooleanValue.of(
-                (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
-                        || (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
+            (visit(ctx.left) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
+                    || (visit(ctx.right) as? BooleanValue)?.data ?: error(ctx, "not a boolean")
         )
     }
 
     override fun visitCommand(ctx: CommandContext): Value? {
-        val command = ctx.commandPart().joinToString("") { stringVisitor.visit(it) }
+        var command = ctx.commandPart().joinToString("") { stringVisitor.visit(it) }
         val current = namespaceStack.peek()
 
         if (ctx.OPEN_FUNCTION() != null) {
@@ -348,9 +369,26 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
                 val namespace = processNamespace(namespaceValue.data, ctx)
                 namespaceStack.add(namespace)
                 this.visit(ctx.block())
+                namespaceStack.pop()
+                command += "function $namespace"
             } else {
                 error(ctx, "functionName is not a string: $namespaceValue")
             }
+        }
+        val functions = parent.output.computeIfAbsent("functions") { HashMap() }
+        val currentFunc = "${functions[current] ?: "#Generated by https://www.github.com/Slackow/FuncPlugin"}\n$command"
+
+        functions[current] = currentFunc
+        return null
+    }
+
+    override fun visitGenMCfunctionStatement(ctx: GenMCfunctionStatementContext): Value? {
+        val loc = visit(ctx.exprBlock().expr())
+        if (loc is StringValue) {
+            val namespace = processNamespace(loc.data, ctx)
+            namespaceStack.add(namespace)
+            visit(ctx.exprBlock().statBlock())
+            namespaceStack.pop()
         }
         return null
     }
@@ -382,7 +420,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
 
     private val stringVisitor = StringVisitor()
 
-    override fun visitPowExpr(ctx: PowExprContext): Value? {
+    override fun visitPowExpr(ctx: PowExprContext): Value {
         val left = visit(ctx.left)
         val right = visit(ctx.right)
         if (left is DoubleValue && right is DoubleValue) {
@@ -391,7 +429,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         error(ctx, "bad type match: ${typeName(left)} ^ ${typeName(right)}")
     }
 
-    override fun visitMultExpr(ctx: MultExprContext): Value? {
+    override fun visitMultExpr(ctx: MultExprContext): Value {
         val left = visit(ctx.left)
         val right = visit(ctx.right)
         if (left is DoubleValue && right is DoubleValue)
@@ -404,7 +442,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         error(ctx, "bad type match: ${typeName(left)} ${ctx.op.text} ${typeName(right)}")
     }
 
-    override fun visitSubExpr(ctx: SubExprContext): Value? {
+    override fun visitSubExpr(ctx: SubExprContext): Value {
         val start = visit(ctx.start) ?: DoubleValue(0.0)
         val end = visit(ctx.end) ?: DoubleValue(1.0)
         if (start is DoubleValue && end is DoubleValue) {
@@ -427,7 +465,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
                             var i = start.intData
                             while (i < end.intData) {
                                 result[i] = main[i]
-                                i+=inc.intData
+                                i += inc.intData
                             }
                             return result
                         }
@@ -446,7 +484,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
                             val result = StringBuilder()
                             while (i < end.intData) {
                                 result[i] = main.data[i]
-                                i+=inc.intData
+                                i += inc.intData
                             }
                             return StringValue(result.toString())
                         }
@@ -487,7 +525,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         }
     }
 
-    override fun visitNegationExpr(ctx: NegationExprContext): Value? {
+    override fun visitNegationExpr(ctx: NegationExprContext): Value {
         val main = visit(ctx.expr())
         return DoubleValue(-((main as? DoubleValue)?.data ?: error(ctx, "bad type match: -${typeName(main)}")))
     }
@@ -500,7 +538,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         return BooleanValue.of(visit(ctx.left) === visit(ctx.right))
     }
 
-    override fun visitRelationalExpr(ctx: RelationalExprContext): Value? {
+    override fun visitRelationalExpr(ctx: RelationalExprContext): Value {
         val left = visit(ctx.left)
         val right = visit(ctx.right)
         if (left is DoubleValue && right is DoubleValue) {
@@ -515,7 +553,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         error(ctx, "bad type match: ${typeName(left)} ${ctx.op.text} ${typeName(right)}")
     }
 
-    override fun visitEqualityExpr(ctx: EqualityExprContext): Value? {
+    override fun visitEqualityExpr(ctx: EqualityExprContext): Value {
         return BooleanValue.of((visit(ctx.left) == visit(ctx.right)) == (ctx.op.type == EQ))
     }
 
@@ -537,7 +575,8 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
 
     override fun visitTernaryExpr(ctx: TernaryExprContext): Value? {
         val conditionValue = visit(ctx.condition)
-        val condition = (conditionValue as? BooleanValue)?.data ?: error(ctx, "bad type match: ${typeName(conditionValue)} ? any : any")
+        val condition = (conditionValue as? BooleanValue)?.data ?: error(ctx,
+            "bad type match: ${typeName(conditionValue)} ? any : any")
         return visit(if (condition) ctx.left else ctx.right)
     }
 
@@ -575,7 +614,7 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
 
     override fun visitForLoop(ctx: ForLoopContext): Value? {
         visit(ctx.first)
-        while ((visit(ctx.condition) as? BooleanValue ?: error(ctx, "condition is not a boolean")).data){
+        while ((visit(ctx.condition) as? BooleanValue ?: error(ctx, "condition is not a boolean")).data) {
             visit(ctx.statBlock())
         }
         visit(ctx.last)
@@ -608,17 +647,17 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         override fun visitCommandGoOnPart(ctx: CommandGoOnPartContext) = " "
 
         override fun visitCommandExprInterpPart(ctx: CommandExprInterpPartContext) =
-                this@FuncVisitor.visit(ctx.expr()).toString()
+            this@FuncVisitor.visit(ctx.expr()).toString()
 
         override fun visitFunctionReferencePart(ctx: FunctionReferencePartContext): String {
             return ctx.stringPart().joinToString("") { visit(it) }
         }
 
         override fun visitCommandIdInterpPart(ctx: CommandIdInterpPartContext) =
-                memory[ctx.text.substring(1)].toString()
+            memory[ctx.text.substring(1)].toString()
 
         override fun visitIdInterpPart(ctx: IdInterpPartContext) =
-                memory[ctx.text.substring(1)].toString()
+            memory[ctx.text.substring(1)].toString()
 
         override fun visitEscapeStringPart(ctx: EscapeStringPartContext): String {
             return when (val c = ctx.text[1]) {
@@ -638,10 +677,10 @@ class FuncVisitor(val parent: Datapack) : FuncParserBaseVisitor<Value?>() {
         }
 
         override fun visitString(ctx: StringContext): String {
-            return ctx.stringPart().joinToString ("") { visit(it) }
+            return ctx.stringPart().joinToString("") { visit(it) }
         }
 
         override fun visitExprInterpPart(ctx: ExprInterpPartContext) =
-                this@FuncVisitor.visit(ctx.expr()).toString()
+            this@FuncVisitor.visit(ctx.expr()).toString()
     }
 }

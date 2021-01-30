@@ -35,7 +35,9 @@ repositories {
     mavenCentral()
 }
 
+
 dependencies {
+    implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
     antlr("org.antlr:antlr4:4.7.2") {
         exclude group: 'com.ibm.icu', module: 'icu4j'

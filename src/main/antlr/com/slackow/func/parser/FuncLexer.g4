@@ -52,7 +52,7 @@ ARROW: '->';
 
 OPEN_STRING: '"' -> pushMode(STRING);
 OPEN_COMMAND: NEWLINE WS? '/' -> pushMode(COMMAND);
-OPEN_MULTI_COMMAND: NEWLINE WS? '/:' (NEWLINE | WS)* -> pushMode(MULTI_LINE_COMMAND), type(OPEN_COMMAND);
+OPEN_MULTI_COMMAND: '/:' (NEWLINE | WS)* -> pushMode(MULTI_LINE_COMMAND), type(OPEN_COMMAND);
 
 ASSERT: 'assert';
 BREAK: 'break';
@@ -67,6 +67,8 @@ GEN: 'gen';
 IF: 'if';
 IN: 'in';
 IS: 'is';
+AS: 'as';
+IMPORT: 'import';
 FUNCTION: 'function';
 NEW: 'new';
 RETURN: 'return';
